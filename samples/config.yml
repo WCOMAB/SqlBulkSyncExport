@@ -1,0 +1,30 @@
+source:
+  connectionString: "Server=localhost;Initial Catalog=SyncTest;Integrated Security=True;TrustServerCertificate=True"
+  entraIdAuth: false
+  # tenantId: "00000000-0000-0000-0000-000000000000"
+
+separator: ","
+includeHeader: true
+newLine: "\r\n"
+writeDeleted: false
+commandTimeoutSeconds: 180
+progressLogBatchSize: 10000
+
+# Uncomment to use interval full sync instead of change tracking:
+# fullSync:
+#   intervalMilliseconds: 3600000
+#   useSnapshotIsolation: false
+#   useApplicationIntentReadOnly: false
+
+useSnapshotIsolationSeed: false
+useApplicationIntentReadOnlySeed: false
+
+tables:
+  customers:
+    source: "dbo.Customers"
+    targetFile: "customers_export.csv"
+    writeDeleted: true
+    deletedFile: "customers_deleted.csv"
+  orders:
+    source: "dbo.Orders"
+    # targetFile defaults to orders.csv

@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>sqlbulksyncexport</ToolCommandName>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageIcon>WCOM128x128_squares.png</PackageIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="SqlBulkSyncExport.Tests" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\icon\WCOM128x128_squares.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Identity" />
+    <PackageReference Include="Devlead.Console" />
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="Sep" />
+    <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.Extensions.DependencyInjection" />
+    <Using Include="Microsoft.Extensions.Logging" />
+    <Using Include="Spectre.Console" />
+    <Using Include="Spectre.Console.Cli" />
+    <Using Include="SqlBulkSyncExport.Commands" />
+    <Using Include="SqlBulkSyncExport.Commands.Settings" />
+    <Using Include="SqlBulkSyncExport.Helpers" />
+    <Using Include="SqlBulkSyncExport.Models" />
+    <Using Include="SqlBulkSyncExport.Models.Config" />
+    <Using Include="SqlBulkSyncExport.Models.Schema" />
+    <Using Include="SqlBulkSyncExport.Models.State" />
+    <Using Include="SqlBulkSyncExport.Services.Config" />
+    <Using Include="SqlBulkSyncExport.Services.Csv" />
+    <Using Include="SqlBulkSyncExport.Services.Export" />
+    <Using Include="SqlBulkSyncExport.Services.Sql" />
+  </ItemGroup>
+
+</Project>

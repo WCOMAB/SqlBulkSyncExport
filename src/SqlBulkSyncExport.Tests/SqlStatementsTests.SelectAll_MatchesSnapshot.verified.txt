@@ -1,0 +1,4 @@
+﻿SELECT  [Id],
+        [Name]
+    FROM dbo.Customers WITH(NOLOCK)
+    ORDER BY [Id] ASC

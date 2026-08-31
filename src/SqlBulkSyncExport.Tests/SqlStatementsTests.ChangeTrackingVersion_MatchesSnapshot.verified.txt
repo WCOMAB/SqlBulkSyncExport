@@ -1,0 +1,6 @@
+﻿SELECT  'dbo.Customers' AS TableName,
+        CHANGE_TRACKING_CURRENT_VERSION() AS CurrentVersion,
+        CHANGE_TRACKING_MIN_VALID_VERSION(ctt.object_id) AS MinValidVersion,
+        SYSDATETIMEOFFSET() AS Queried
+    FROM sys.change_tracking_tables AS ctt
+    WHERE ctt.object_id = OBJECT_ID(N'dbo.Customers')

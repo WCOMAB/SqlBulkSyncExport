@@ -1,0 +1,168 @@
+using System.Data.Common;
+using System.Globalization;
+using System.Text;
+using nietras.SeparatedValues;
+
+namespace SqlBulkSyncExport.Services.Csv;
+
+public sealed class SepCsvExportWriter(ILogger<SepCsvExportWriter> logger) : ICsvExportWriter
+{
+    private const string DateTimeFormat = "yyyy-MM-dd'T'HH:mm:ss.fffK";
+    private const string DateOnlyFormat = "yyyy-MM-dd";
+    private const string TimeOnlyFormat = "HH:mm:ss.fffK";
+    private const string TimeSpanFormat = @"hh\:mm\:ss\.fff";
+
+    public async Task<long> WriteAsync(
+        string filePath,
+        DbDataReader reader,
+        CsvWriteOptions options,
+        CancellationToken cancellationToken)
+    {
+        var directory = Path.GetDirectoryName(filePath);
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        await using var file = new FileStream(
+            filePath,
+            FileMode.Create,
+            FileAccess.Write,
+            FileShare.Read,
+            bufferSize: 64 * 1024,
+            options: FileOptions.Asynchronous | FileOptions.SequentialScan);
+        await using var buffered = new BufferedStream(file, 64 * 1024);
+        await using var text = new StreamWriter(
+            buffered,
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+            bufferSize: 64 * 1024)
+        {
+            NewLine = options.NewLine
+        };
+
+        var fieldCount = reader.FieldCount;
+        var names = new string[fieldCount];
+        for (var i = 0; i < fieldCount; i++)
+        {
+            names[i] = reader.GetName(i);
+        }
+
+        await using var writer = Sep.New(options.Separator).Writer(o => o with
+        {
+            WriteHeader = options.IncludeHeader,
+            CultureInfo = CultureInfo.InvariantCulture
+        }).To(text, leaveOpen: true);
+
+        if (options.IncludeHeader)
+        {
+            writer.Header.Add(names);
+        }
+
+        var batchSize = options.ProgressLogBatchSize;
+        long rows = 0;
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            using var row = writer.NewRow();
+            for (var i = 0; i < fieldCount; i++)
+            {
+                if (reader.IsDBNull(i))
+                {
+                    row[names[i]].Set(string.Empty);
+                    continue;
+                }
+
+                SetValue(row[names[i]], reader, i, options);
+            }
+
+            rows++;
+            if (batchSize > 0 && rows % batchSize == 0)
+            {
+                logger.LogInformation(
+                    "Wrote {Rows} rows to {Path}",
+                    rows,
+                    filePath);
+            }
+        }
+
+        return rows;
+    }
+
+    private static void SetValue(
+        SepWriter.Col col,
+        DbDataReader reader,
+        int ordinal,
+        CsvWriteOptions options)
+    {
+        var value = reader.GetValue(ordinal);
+        switch (value)
+        {
+            case string s:
+                col.Set(s);
+                break;
+            case byte[] bytes:
+                col.Set(Convert.ToBase64String(bytes));
+                break;
+            case bool b:
+                col.Set(b ? "True" : "False");
+                break;
+            case byte b:
+                col.Format(b);
+                break;
+            case short s:
+                col.Format(s);
+                break;
+            case int i:
+                col.Format(i);
+                break;
+            case long l:
+                col.Format(l);
+                break;
+            case float f:
+                col.Format(f);
+                break;
+            case double d:
+                col.Format(d);
+                break;
+            case decimal m:
+                col.Format(m);
+                break;
+            case Guid g:
+                col.Format(g);
+                break;
+            case DateTime dt:
+                col.Set(FormatDateTime(dt, options.SourceTimeZone));
+                break;
+            case DateTimeOffset dto:
+                col.Set(dto.ToString(DateTimeFormat, CultureInfo.InvariantCulture));
+                break;
+            case TimeSpan ts:
+                col.Set(ts.ToString(TimeSpanFormat, CultureInfo.InvariantCulture));
+                break;
+            case DateOnly dateOnly:
+                col.Set(dateOnly.ToString(DateOnlyFormat, CultureInfo.InvariantCulture));
+                break;
+            case TimeOnly timeOnly:
+                col.Set(timeOnly.ToString(TimeOnlyFormat, CultureInfo.InvariantCulture));
+                break;
+            default:
+                col.Set(Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty);
+                break;
+        }
+    }
+
+    private static string FormatDateTime(DateTime dt, TimeZoneInfo sourceTimeZone)
+        => dt.Kind == DateTimeKind.Utc
+            ? dt.ToString(DateTimeFormat, CultureInfo.InvariantCulture)
+            : ToSourceDateTimeOffset(dt, sourceTimeZone)
+                .ToString(DateTimeFormat, CultureInfo.InvariantCulture);
+
+    private static DateTimeOffset ToSourceDateTimeOffset(DateTime dt, TimeZoneInfo sourceTimeZone)
+        => dt.Kind switch
+        {
+            DateTimeKind.Local => new DateTimeOffset(dt),
+            _ => new DateTimeOffset(
+                DateTime.SpecifyKind(dt, DateTimeKind.Unspecified),
+                sourceTimeZone.GetUtcOffset(dt)),
+        };
+}

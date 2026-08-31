@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="SqlBulkSyncExport/SqlBulkSyncExport.csproj" />
+  <Project Path="SqlBulkSyncExport.Tests/SqlBulkSyncExport.Tests.csproj" />
+</Solution>

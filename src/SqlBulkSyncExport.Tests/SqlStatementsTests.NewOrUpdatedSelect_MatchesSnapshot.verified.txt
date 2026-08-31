@@ -1,0 +1,4 @@
+﻿SELECT  t.[Id],
+        t.[Name]
+    FROM CHANGETABLE(CHANGES dbo.Customers, @FromVersion) AS ct
+        INNER JOIN dbo.Customers AS t WITH(NOLOCK) ON t.[Id] = ct.[Id]

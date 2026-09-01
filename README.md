@@ -18,11 +18,11 @@ sqlbulksyncexport sync <config.yml> <state.yml> <outputfolder> [OPTIONS]
 
 Options:
 
-| Option | Description |
-|--------|-------------|
-| `--seed` | Force a full snapshot for change-tracking jobs |
-| `--include-table <key>` | Only export the given table key (repeatable) |
-| `--exclude-table <key>` | Skip the given table key (repeatable) |
+| Option                  | Description                                    |
+|-------------------------|------------------------------------------------|
+| `--seed`                | Force a full snapshot for change-tracking jobs |
+| `--include-table <key>` | Only export the given table key (repeatable)   |
+| `--exclude-table <key>` | Skip the given table key (repeatable)          |
 
 ## Authentication
 
@@ -32,7 +32,27 @@ Set `source.entraIdAuth: true` to authenticate with `DefaultAzureCredential` (op
 
 ## Configuration
 
-See [`samples/config.yml`](samples/config.yml).
+See [`samples/config.yml`](samples/config.yml) for a fuller example.
+
+Minimal config (table key becomes the default `{key}.csv` file name):
+
+```yaml
+source:
+  connectionString: "Server=localhost;Initial Catalog=SyncTest;Integrated Security=True;TrustServerCertificate=True"
+  # entraIdAuth: true          # optional; DefaultAzureCredential
+  # tenantId: "00000000-0000-0000-0000-000000000000"  # optional; or AZURE_TENANT_ID
+
+tables:
+  dbo_Customers:
+    source: dbo.Customers
+  dbo_Orders:
+    source: dbo.Orders
+```
+
+Optional `source` fields:
+
+- `entraIdAuth` — defaults to **false**; set **true** for Entra / `DefaultAzureCredential`
+- `tenantId` — optional tenant for Entra auth (falls back to `AZURE_TENANT_ID`)
 
 Important defaults:
 
@@ -41,7 +61,10 @@ Important defaults:
 - `newLine` defaults to CRLF (`\r\n`)
 - `progressLogBatchSize` defaults to **10000** (log every N written rows; `<= 0` disables)
 - `targetFile` / `deletedFile` are **file names with extension**, no path
-- Timestamp/version tokens are inserted **before** the extension
+- Timestamp/version tokens are inserted **before** the extension, for example:
+  - delta: `dbo_Customers_20260101120000_0000000010_0000000020.csv`
+  - full snapshot: `dbo_Customers_20260101120000_0000000020_full.csv`
+  - deleted PKs (when enabled): `dbo_Customers.deleted_20260101120000_0000000010_0000000020.csv`
 
 ## Sync state
 

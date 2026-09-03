@@ -10,15 +10,17 @@ public sealed class SyncCommand(
         SyncSettings settings,
         CancellationToken cancellationToken)
     {
+        var config = yamlConfigStore.LoadConfig(settings.ConfigPath);
+        var state = yamlConfigStore.LoadState(settings.StatePath);
+        var parallelism = ParallelismResolver.Resolve(settings.Parallelism, config.Parallelism);
+
         logger.LogInformation(
-            "Starting sync. Config={Config} State={State} Output={Output} Seed={Seed}",
+            "Starting sync. Config={Config} State={State} Output={Output} Seed={Seed} Parallelism={Parallelism}",
             settings.ConfigPath,
             settings.StatePath,
             settings.OutputFolder,
-            settings.Seed);
-
-        var config = yamlConfigStore.LoadConfig(settings.ConfigPath);
-        var state = yamlConfigStore.LoadState(settings.StatePath);
+            settings.Seed,
+            parallelism);
 
         return await syncExportService.RunAsync(
             config,
@@ -28,6 +30,7 @@ public sealed class SyncCommand(
             settings.Seed,
             settings.IncludeTables,
             settings.ExcludeTables,
+            parallelism,
             cancellationToken);
     }
 }

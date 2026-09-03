@@ -28,6 +28,10 @@ public sealed class SyncSettings : CommandSettings
     [Description("Exclude the specified table key (repeatable).")]
     public string[]? ExcludeTables { get; init; }
 
+    [CommandOption("--parallelism")]
+    [Description("Max number of tables to export concurrently (overrides YAML parallelism when set).")]
+    public int? Parallelism { get; init; }
+
     public override ValidationResult Validate()
     {
         if (string.IsNullOrWhiteSpace(ConfigPath))
@@ -43,6 +47,11 @@ public sealed class SyncSettings : CommandSettings
         if (string.IsNullOrWhiteSpace(OutputFolder))
         {
             return ValidationResult.Error("Output folder is required.");
+        }
+
+        if (Parallelism is < 1)
+        {
+            return ValidationResult.Error("Parallelism must be greater than 0.");
         }
 
         return ValidationResult.Success();

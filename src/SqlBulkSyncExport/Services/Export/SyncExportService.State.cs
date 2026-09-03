@@ -19,4 +19,24 @@ public sealed partial class SyncExportService
         entry.Queried = sourceVersion.Queried;
         entry.Updated = updated;
     }
+
+    private async Task PersistTableStateAsync(
+        SyncState state,
+        string statePath,
+        string tableKey,
+        TableVersion sourceVersion,
+        SemaphoreSlim stateGate,
+        CancellationToken cancellationToken)
+    {
+        await stateGate.WaitAsync(cancellationToken);
+        try
+        {
+            UpsertState(state, tableKey, sourceVersion, timeProvider.GetUtcNow());
+            yamlConfigStore.SaveState(statePath, state);
+        }
+        finally
+        {
+            stateGate.Release();
+        }
+    }
 }

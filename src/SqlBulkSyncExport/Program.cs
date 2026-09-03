@@ -4,6 +4,7 @@ public partial class Program
     {
         services
             .AddSingleton(TimeProvider.System)
+            .AddSingleton<IAnsiConsole>(_ => AnsiConsole.Console)
             .AddSingleton<IYamlConfigStore, YamlConfigStore>()
             .AddSingleton<ISqlConnectionFactory, SqlConnectionFactory>()
             .AddSingleton<ISchemaService, SchemaService>()

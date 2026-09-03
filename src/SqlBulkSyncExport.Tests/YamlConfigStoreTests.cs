@@ -27,6 +27,7 @@ public sealed class YamlConfigStoreTests
 
             Assert.True(config.IncludeHeader);
             Assert.False(config.WriteDeleted);
+            Assert.Null(config.Parallelism);
             Assert.Equal(",", config.Separator);
             Assert.Equal("\r\n", config.NewLine);
         }

@@ -10,5 +10,6 @@ public interface ISyncExportService
         bool seed,
         IReadOnlyCollection<string>? includeTables,
         IReadOnlyCollection<string>? excludeTables,
+        int parallelism,
         CancellationToken cancellationToken);
 }

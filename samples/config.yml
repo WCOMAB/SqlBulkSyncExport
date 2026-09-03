@@ -8,6 +8,7 @@ includeHeader: true
 newLine: "\r\n"
 writeDeleted: false
 commandTimeoutSeconds: 180
+# parallelism: omit/null = 1 (sequential); N = max concurrent table exports (CLI --parallelism overrides)
 # progressLogBatchSize: omit/null = auto (tiered % via COUNT + ETA); 0 = off; N = fixed interval
 # progressLogBatchSize: 10000
 

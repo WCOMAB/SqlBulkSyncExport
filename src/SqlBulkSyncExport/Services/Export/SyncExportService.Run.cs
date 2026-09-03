@@ -1,6 +1,5 @@
+using System.Collections.Concurrent;
 using System.Globalization;
-using Microsoft.Data.SqlClient;
-using SqlBulkSyncExport.Helpers;
 
 namespace SqlBulkSyncExport.Services.Export;
 
@@ -14,6 +13,7 @@ public sealed partial class SyncExportService
         bool seed,
         IReadOnlyCollection<string>? includeTables,
         IReadOnlyCollection<string>? excludeTables,
+        int parallelism,
         CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(outputFolder);
@@ -35,15 +35,18 @@ public sealed partial class SyncExportService
             return 0;
         }
 
-        await using var connection = await connectionFactory.CreateOpenConnectionAsync(
+        string timeZoneId;
+        await using (var connection = await connectionFactory.CreateOpenConnectionAsync(
             config.Source,
             applicationIntentReadOnly: false,
-            cancellationToken);
+            cancellationToken))
+        {
+            timeZoneId = await schemaService.GetCurrentTimeZoneIdAsync(
+                connection,
+                config.CommandTimeoutSeconds,
+                cancellationToken);
+        }
 
-        var timeZoneId = await schemaService.GetCurrentTimeZoneIdAsync(
-            connection,
-            config.CommandTimeoutSeconds,
-            cancellationToken);
         var sourceTimeZone = SourceTimeZoneResolver.Resolve(timeZoneId);
         logger.LogInformation("Source timezone: {TimeZoneId}", timeZoneId);
 
@@ -53,143 +56,39 @@ public sealed partial class SyncExportService
             newLine,
             sourceTimeZone);
 
-        foreach (var table in tables)
+        using var stateGate = new SemaphoreSlim(1, 1);
+        var results = new ConcurrentDictionary<string, TableExportResult>(StringComparer.OrdinalIgnoreCase);
+        var parallelOptions = new ParallelOptions
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            logger.LogInformation("Processing table {TableKey} ({SourceTable})...", table.Key, table.SourceTableName);
+            MaxDegreeOfParallelism = parallelism,
+            CancellationToken = cancellationToken
+        };
 
-            state.Tables.TryGetValue(table.Key, out var tableState);
-
-            var columns = await schemaService.GetColumnsAsync(
-                connection,
-                table.SourceTableName,
-                config.CommandTimeoutSeconds,
-                cancellationToken);
-
-            TableVersion sourceVersion;
-            ExportDecision decision;
-
-            if (isFullSyncJob)
+        var syncStartedAt = timeProvider.GetUtcNow();
+        var syncStarted = timeProvider.GetTimestamp();
+        await Parallel.ForEachAsync(
+            tables,
+            parallelOptions,
+            async (table, ct) =>
             {
-                sourceVersion = await schemaService.GetUnixEpochVersionAsync(
-                    connection,
-                    table.SourceTableName,
-                    config.CommandTimeoutSeconds,
-                    cancellationToken);
-                decision = ExportDecisionMaker.DecideFullSync(
-                    tableState,
-                    sourceVersion,
-                    config.FullSync!.IntervalMilliseconds);
-            }
-            else
-            {
-                sourceVersion = await schemaService.GetChangeTrackingVersionAsync(
-                    connection,
-                    table.SourceTableName,
-                    config.CommandTimeoutSeconds,
-                    cancellationToken);
-                decision = ExportDecisionMaker.DecideChangeTracking(tableState, sourceVersion, seed && !isFullSyncJob);
-            }
+                var result = await ProcessTableAsync(
+                    config,
+                    state,
+                    statePath,
+                    outputFolder,
+                    seed,
+                    isFullSyncJob,
+                    stamp,
+                    csvOptionsBase,
+                    table,
+                    stateGate,
+                    ct);
+                results[table.Key] = result;
+            });
+        var syncDuration = timeProvider.GetElapsedTime(syncStarted);
+        var syncEndedAt = timeProvider.GetUtcNow();
 
-            logger.LogInformation(
-                "Table {TableKey}: mode={Mode}, from={FromVersion}, to={ToVersion}",
-                table.Key,
-                decision.Mode,
-                decision.FromVersion,
-                decision.ToVersion);
-
-            if (decision.Mode == ExportMode.Skip)
-            {
-                UpsertState(state, table.Key, sourceVersion, timeProvider.GetUtcNow());
-                yamlConfigStore.SaveState(statePath, state);
-                continue;
-            }
-
-            SqlConnection readConnection = connection;
-            SqlConnection? readonlyConnection = null;
-            if (table.UseApplicationIntentReadOnly)
-            {
-                readonlyConnection = await connectionFactory.CreateOpenConnectionAsync(
-                    config.Source,
-                    applicationIntentReadOnly: true,
-                    cancellationToken);
-                readConnection = readonlyConnection;
-            }
-
-            try
-            {
-                if (decision.Mode == ExportMode.Full)
-                {
-                    var fileName = fileNameBuilder.BuildFullFileName(
-                        table.TargetFileName,
-                        stamp,
-                        decision.ToVersion);
-                    var path = Path.Combine(outputFolder, fileName);
-                    var rows = await ExportFullAsync(
-                        readConnection,
-                        table,
-                        columns,
-                        config.CommandTimeoutSeconds,
-                        path,
-                        csvOptionsBase,
-                        config.ProgressLogBatchSize,
-                        cancellationToken);
-                    logger.LogInformation("Wrote {Rows} rows to {Path}", rows, path);
-                }
-                else
-                {
-                    var changesName = fileNameBuilder.BuildDeltaFileName(
-                        table.TargetFileName,
-                        stamp,
-                        decision.FromVersion,
-                        decision.ToVersion);
-                    var changesPath = Path.Combine(outputFolder, changesName);
-                    var changeRows = await ExportDeltaAsync(
-                        connection,
-                        table.SourceTableName,
-                        columns,
-                        decision.FromVersion,
-                        config.CommandTimeoutSeconds,
-                        changesPath,
-                        csvOptionsBase,
-                        config.ProgressLogBatchSize,
-                        cancellationToken);
-                    logger.LogInformation("Wrote {Rows} change rows to {Path}", changeRows, changesPath);
-
-                    if (table.WriteDeleted)
-                    {
-                        var deletedName = fileNameBuilder.BuildDeletedFileName(
-                            table.DeletedFileName,
-                            stamp,
-                            decision.FromVersion,
-                            decision.ToVersion);
-                        var deletedPath = Path.Combine(outputFolder, deletedName);
-                        var deletedRows = await ExportDeletedAsync(
-                            connection,
-                            table.SourceTableName,
-                            columns,
-                            decision.FromVersion,
-                            config.CommandTimeoutSeconds,
-                            deletedPath,
-                            csvOptionsBase,
-                            config.ProgressLogBatchSize,
-                            cancellationToken);
-                        logger.LogInformation("Wrote {Rows} deleted PK rows to {Path}", deletedRows, deletedPath);
-                    }
-                }
-            }
-            finally
-            {
-                if (readonlyConnection is not null)
-                {
-                    await readonlyConnection.DisposeAsync();
-                }
-            }
-
-            UpsertState(state, table.Key, sourceVersion, timeProvider.GetUtcNow());
-            yamlConfigStore.SaveState(statePath, state);
-        }
-
+        WriteSyncSummary(tables, results, syncDuration, syncStartedAt, syncEndedAt);
         return 0;
     }
 }

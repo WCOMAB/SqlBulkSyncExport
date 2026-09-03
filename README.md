@@ -18,11 +18,12 @@ sqlbulksyncexport sync <config.yml> <state.yml> <outputfolder> [OPTIONS]
 
 Options:
 
-| Option                  | Description                                    |
-|-------------------------|------------------------------------------------|
-| `--seed`                | Force a full snapshot for change-tracking jobs |
-| `--include-table <key>` | Only export the given table key (repeatable)   |
-| `--exclude-table <key>` | Skip the given table key (repeatable)          |
+| Option                  | Description                                                           |
+|-------------------------|-----------------------------------------------------------------------|
+| `--seed`                | Force a full snapshot for change-tracking jobs                        |
+| `--include-table <key>` | Only export the given table key (repeatable)                          |
+| `--exclude-table <key>` | Skip the given table key (repeatable)                                 |
+| `--parallelism <n>`     | Max tables to export concurrently (overrides YAML `parallelism`)      |
 
 ## Authentication
 
@@ -59,6 +60,7 @@ Important defaults:
 - `includeHeader` defaults to **true** when omitted
 - `writeDeleted` defaults to **false** (opt-in deleted PK files)
 - `newLine` defaults to CRLF (`\r\n`)
+- `parallelism` omitted/`null` = sequential (1); positive integer = max concurrent table exports; CLI `--parallelism` overrides YAML when set
 - `progressLogBatchSize` omitted/`null` = auto via `COUNT` (logs percent + ETA; step size by row count: &lt;1k → 50%, &lt;5k → 25%, &lt;10k → 20%, &lt;25k → 10%, &lt;250k → 5%, &lt;500k → 2%, else 1%); `<= 0` disables; positive = fixed row interval (no COUNT/%/ETA)
 - `targetFile` / `deletedFile` are **file names with extension**, no path
 - Timestamp/version tokens are inserted **before** the extension, for example:

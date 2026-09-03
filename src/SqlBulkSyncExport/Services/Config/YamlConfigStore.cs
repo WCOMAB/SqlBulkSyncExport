@@ -46,6 +46,11 @@ public sealed class YamlConfigStore : IYamlConfigStore
             throw new InvalidOperationException("fullSync.intervalMilliseconds must be greater than 0.");
         }
 
+        if (config.Parallelism is <= 0)
+        {
+            throw new InvalidOperationException("parallelism must be greater than 0.");
+        }
+
         foreach (var (key, table) in config.Tables)
         {
             if (string.IsNullOrWhiteSpace(table.Source))

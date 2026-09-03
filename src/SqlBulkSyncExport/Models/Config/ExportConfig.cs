@@ -22,6 +22,13 @@ public sealed class ExportConfig
     /// </summary>
     public int? ProgressLogBatchSize { get; init; }
 
+    /// <summary>
+    /// Max number of tables to export concurrently.
+    /// Null/omitted = use CLI <c>--parallelism</c> if set, otherwise 1.
+    /// Must be greater than 0 when set. CLI overrides this value when specified.
+    /// </summary>
+    public int? Parallelism { get; init; }
+
     public FullSyncConfig? FullSync { get; init; }
 
     public bool UseSnapshotIsolationSeed { get; init; }

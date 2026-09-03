@@ -7,4 +7,5 @@ public sealed partial class SyncExportService(
     IExportFileNameBuilder fileNameBuilder,
     IYamlConfigStore yamlConfigStore,
     TimeProvider timeProvider,
+    IAnsiConsole ansiConsole,
     ILogger<SyncExportService> logger) : ISyncExportService;

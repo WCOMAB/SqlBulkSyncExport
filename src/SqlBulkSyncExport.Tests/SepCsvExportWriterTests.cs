@@ -121,8 +121,46 @@ public sealed class SepCsvExportWriterTests
         }
     }
 
+    [Fact]
+    public async Task WriteAsync_WhenCellThrows_OuterExceptionNamesColumn()
+    {
+        var boom = new InvalidOperationException("boom-cell");
+        await using var reader = new ObjectRowDbDataReader(
+            ["Id", "Boom", "After"],
+            [1, "trigger", "tail"],
+            throwOnGetValue: ordinal => ordinal == 1 ? boom : null);
+
+        var path = Path.Combine(Path.GetTempPath(), $"sbs-csv-{Guid.NewGuid():N}.csv");
+        try
+        {
+            var writer = new SepCsvExportWriter(NullLogger<SepCsvExportWriter>.Instance);
+            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => writer.WriteAsync(
+                path,
+                reader,
+                new CsvWriteOptions(',', IncludeHeader: true, NewLine: "\r\n", SourceTimeZone: TimeZoneInfo.Utc, ProgressLogBatchSize: 0),
+                TestContext.Current.CancellationToken));
+
+            Assert.Contains("Boom", ex.Message, StringComparison.Ordinal);
+            Assert.Contains("ordinal 1", ex.Message, StringComparison.Ordinal);
+            Assert.Contains("data row 1", ex.Message, StringComparison.Ordinal);
+            Assert.Contains(path, ex.Message, StringComparison.Ordinal);
+            Assert.DoesNotContain("Not all expected columns", ex.Message, StringComparison.Ordinal);
+            Assert.Same(boom, ex.InnerException);
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
     /// <summary>Minimal reader that preserves boxed value types (including DateTimeKind).</summary>
-    private sealed class ObjectRowDbDataReader(string[] names, object[] values) : DbDataReader
+    private sealed class ObjectRowDbDataReader(
+        string[] names,
+        object[] values,
+        Func<int, Exception?>? throwOnGetValue = null) : DbDataReader
     {
         private bool _read;
 
@@ -155,7 +193,16 @@ public sealed class SepCsvExportWriterTests
 
         public override int GetOrdinal(string name) => Array.IndexOf(names, name);
 
-        public override object GetValue(int ordinal) => values[ordinal];
+        public override object GetValue(int ordinal)
+        {
+            var failure = throwOnGetValue?.Invoke(ordinal);
+            if (failure is not null)
+            {
+                throw failure;
+            }
+
+            return values[ordinal];
+        }
 
         public override bool IsDBNull(int ordinal) => values[ordinal] is DBNull or null;
 
@@ -183,7 +230,8 @@ public sealed class SepCsvExportWriterTests
 
         public override double GetDouble(int ordinal) => (double)GetValue(ordinal);
 
-        public override Type GetFieldType(int ordinal) => GetValue(ordinal).GetType();
+        public override Type GetFieldType(int ordinal)
+            => values[ordinal] is DBNull or null ? typeof(object) : values[ordinal].GetType();
 
         public override float GetFloat(int ordinal) => (float)GetValue(ordinal);
 

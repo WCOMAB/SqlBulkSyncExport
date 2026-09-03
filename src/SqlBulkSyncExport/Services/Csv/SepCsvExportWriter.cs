@@ -41,11 +41,7 @@ public sealed class SepCsvExportWriter(ILogger<SepCsvExportWriter> logger) : ICs
         };
 
         var fieldCount = reader.FieldCount;
-        var names = new string[fieldCount];
-        for (var i = 0; i < fieldCount; i++)
-        {
-            names[i] = reader.GetName(i);
-        }
+        var names = CacheFieldNames(reader, fieldCount);
 
         await using var writer = Sep.New(options.Separator).Writer(o => o with
         {
@@ -53,6 +49,7 @@ public sealed class SepCsvExportWriter(ILogger<SepCsvExportWriter> logger) : ICs
             CultureInfo = CultureInfo.InvariantCulture
         }).To(text, leaveOpen: true);
 
+        // Header.Add order defines Sep ordinals 0..n-1 to match reader ordinals for the reader lifetime.
         if (options.IncludeHeader)
         {
             writer.Header.Add(names);
@@ -63,19 +60,55 @@ public sealed class SepCsvExportWriter(ILogger<SepCsvExportWriter> logger) : ICs
         while (await reader.ReadAsync(cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            using var row = writer.NewRow();
-            for (var i = 0; i < fieldCount; i++)
-            {
-                if (reader.IsDBNull(i))
-                {
-                    row[names[i]].Set(string.Empty);
-                    continue;
-                }
+            rows++;
 
-                SetValue(row[names[i]], reader, i, options);
+            Exception? cellFailure = null;
+            var failedOrdinal = -1;
+
+            using (var row = writer.NewRow())
+            {
+                for (var i = 0; i < fieldCount; i++)
+                {
+                    if (cellFailure is not null)
+                    {
+                        row[i].Set(string.Empty);
+                        continue;
+                    }
+
+                    try
+                    {
+                        if (reader.IsDBNull(i))
+                        {
+                            row[i].Set(string.Empty);
+                        }
+                        else
+                        {
+                            SetValue(row[i], reader, i, options);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        cellFailure = ex;
+                        failedOrdinal = i;
+                        try
+                        {
+                            row[i].Set(string.Empty);
+                        }
+                        catch
+                        {
+                            // Ensure EndRow does not mask the original cell failure.
+                        }
+                    }
+                }
             }
 
-            rows++;
+            if (cellFailure is not null)
+            {
+                throw new InvalidOperationException(
+                    $"Failed writing CSV column '{names[failedOrdinal]}' (ordinal {failedOrdinal}) at data row {rows} for '{filePath}'.",
+                    cellFailure);
+            }
+
             if (batchSize > 0 && rows % batchSize == 0)
             {
                 logger.LogInformation(
@@ -86,6 +119,25 @@ public sealed class SepCsvExportWriter(ILogger<SepCsvExportWriter> logger) : ICs
         }
 
         return rows;
+    }
+
+    private static string[] CacheFieldNames(DbDataReader reader, int fieldCount)
+    {
+        var names = new string[fieldCount];
+        var seen = new HashSet<string>(fieldCount, StringComparer.Ordinal);
+        for (var i = 0; i < fieldCount; i++)
+        {
+            var name = reader.GetName(i);
+            if (!seen.Add(name))
+            {
+                throw new InvalidOperationException(
+                    $"Duplicate column name '{name}' at reader ordinal {i}. CSV export requires unique field names.");
+            }
+
+            names[i] = name;
+        }
+
+        return names;
     }
 
     private static void SetValue(

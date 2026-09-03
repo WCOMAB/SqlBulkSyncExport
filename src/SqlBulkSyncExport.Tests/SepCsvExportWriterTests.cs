@@ -91,6 +91,41 @@ public sealed class SepCsvExportWriterTests
     }
 
     [Fact]
+    public async Task WriteAsync_FormatsOutOfRangeDateTimeWithoutOffset()
+    {
+        // 0001-01-01 +02:00 would make UTC year 0 and throw from DateTimeOffset.
+        var minUnspecified = new DateTime(1, 1, 1, 0, 0, 0, DateTimeKind.Unspecified);
+
+        await using var reader = new ObjectRowDbDataReader(
+            ["ReturnDate"],
+            [minUnspecified]);
+
+        var path = Path.Combine(Path.GetTempPath(), $"sbs-csv-{Guid.NewGuid():N}.csv");
+        try
+        {
+            var writer = new SepCsvExportWriter(NullLogger<SepCsvExportWriter>.Instance);
+            await writer.WriteAsync(
+                path,
+                reader,
+                new CsvWriteOptions(',', IncludeHeader: true, NewLine: "\r\n", SourceTimeZone: PlusTwo, ProgressLogBatchSize: 0),
+                TestContext.Current.CancellationToken);
+
+            var text = await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken);
+            Assert.Equal(
+                "ReturnDate\r\n" +
+                "0001-01-01T00:00:00.000\r\n",
+                text);
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Fact]
     public async Task WriteAsync_CanDisableHeader()
     {
         var table = new DataTable();

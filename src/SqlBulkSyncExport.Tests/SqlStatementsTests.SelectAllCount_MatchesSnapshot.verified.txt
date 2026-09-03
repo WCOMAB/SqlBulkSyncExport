@@ -1,0 +1,2 @@
+﻿SELECT COUNT_BIG(*)
+    FROM dbo.Customers WITH(NOLOCK)

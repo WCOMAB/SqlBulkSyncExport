@@ -59,7 +59,7 @@ Important defaults:
 - `includeHeader` defaults to **true** when omitted
 - `writeDeleted` defaults to **false** (opt-in deleted PK files)
 - `newLine` defaults to CRLF (`\r\n`)
-- `progressLogBatchSize` defaults to **10000** (log every N written rows; `<= 0` disables)
+- `progressLogBatchSize` omitted/`null` = auto via `COUNT` (logs percent + ETA; step size by row count: &lt;1k → 50%, &lt;5k → 25%, &lt;10k → 20%, &lt;25k → 10%, &lt;250k → 5%, &lt;500k → 2%, else 1%); `<= 0` disables; positive = fixed row interval (no COUNT/%/ETA)
 - `targetFile` / `deletedFile` are **file names with extension**, no path
 - Timestamp/version tokens are inserted **before** the extension, for example:
   - delta: `dbo_Customers_20260101120000_0000000010_0000000020.csv`

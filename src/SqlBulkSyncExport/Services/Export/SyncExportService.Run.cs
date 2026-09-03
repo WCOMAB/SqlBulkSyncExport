@@ -47,12 +47,11 @@ public sealed partial class SyncExportService
         var sourceTimeZone = SourceTimeZoneResolver.Resolve(timeZoneId);
         logger.LogInformation("Source timezone: {TimeZoneId}", timeZoneId);
 
-        var csvOptions = new CsvWriteOptions(
+        var csvOptionsBase = new CsvWriteOptions(
             separator,
             config.IncludeHeader,
             newLine,
-            sourceTimeZone,
-            config.ProgressLogBatchSize);
+            sourceTimeZone);
 
         foreach (var table in tables)
         {
@@ -132,7 +131,8 @@ public sealed partial class SyncExportService
                         columns,
                         config.CommandTimeoutSeconds,
                         path,
-                        csvOptions,
+                        csvOptionsBase,
+                        config.ProgressLogBatchSize,
                         cancellationToken);
                     logger.LogInformation("Wrote {Rows} rows to {Path}", rows, path);
                 }
@@ -151,7 +151,8 @@ public sealed partial class SyncExportService
                         decision.FromVersion,
                         config.CommandTimeoutSeconds,
                         changesPath,
-                        csvOptions,
+                        csvOptionsBase,
+                        config.ProgressLogBatchSize,
                         cancellationToken);
                     logger.LogInformation("Wrote {Rows} change rows to {Path}", changeRows, changesPath);
 
@@ -170,7 +171,8 @@ public sealed partial class SyncExportService
                             decision.FromVersion,
                             config.CommandTimeoutSeconds,
                             deletedPath,
-                            csvOptions,
+                            csvOptionsBase,
+                            config.ProgressLogBatchSize,
                             cancellationToken);
                         logger.LogInformation("Wrote {Rows} deleted PK rows to {Path}", deletedRows, deletedPath);
                     }

@@ -1,0 +1,3 @@
+﻿SELECT COUNT_BIG(*)
+    FROM CHANGETABLE(CHANGES dbo.Customers, @FromVersion) AS ct
+    WHERE ct.SYS_CHANGE_OPERATION = N'D'

@@ -92,6 +92,12 @@ public static class SqlStatements
             """;
     }
 
+    public static string GetSelectAllCountStatement(string sourceTableName, bool useSnapshotIsolation)
+        => $"""
+            SELECT COUNT_BIG(*)
+                FROM {sourceTableName}{(useSnapshotIsolation ? string.Empty : " WITH(NOLOCK)")}
+            """;
+
     public static string GetNewOrUpdatedSelectStatement(
         string sourceTableName,
         IReadOnlyList<Column> columns)
@@ -102,12 +108,24 @@ public static class SqlStatements
         var selectList = string.Join(
             ",\r\n        ",
             columns.Select(c => "t." + c.QuoteName));
-        var join = string.Join(
-            " AND\r\n        ",
-            columns.Where(c => c.IsPrimary).Select(c => $"t.{c.QuoteName} = ct.{c.QuoteName}"));
+        var join = PrimaryKeyJoin(columns);
 
         return $"""
             SELECT  {selectList}
+                FROM CHANGETABLE(CHANGES {sourceTableName}, @FromVersion) AS ct
+                    INNER JOIN {sourceTableName} AS t WITH(NOLOCK) ON {join}
+            """;
+    }
+
+    public static string GetNewOrUpdatedCountStatement(
+        string sourceTableName,
+        IReadOnlyList<Column> columns)
+    {
+        EnsurePrimaryKey(sourceTableName, columns);
+        var join = PrimaryKeyJoin(columns);
+
+        return $"""
+            SELECT COUNT_BIG(*)
                 FROM CHANGETABLE(CHANGES {sourceTableName}, @FromVersion) AS ct
                     INNER JOIN {sourceTableName} AS t WITH(NOLOCK) ON {join}
             """;
@@ -129,6 +147,24 @@ public static class SqlStatements
                 WHERE ct.SYS_CHANGE_OPERATION = N'D'
             """;
     }
+
+    public static string GetDeletedPrimaryKeysCountStatement(
+        string sourceTableName,
+        IReadOnlyList<Column> columns)
+    {
+        EnsurePrimaryKey(sourceTableName, columns);
+
+        return $"""
+            SELECT COUNT_BIG(*)
+                FROM CHANGETABLE(CHANGES {sourceTableName}, @FromVersion) AS ct
+                WHERE ct.SYS_CHANGE_OPERATION = N'D'
+            """;
+    }
+
+    private static string PrimaryKeyJoin(IReadOnlyList<Column> columns)
+        => string.Join(
+            " AND\r\n        ",
+            columns.Where(c => c.IsPrimary).Select(c => $"t.{c.QuoteName} = ct.{c.QuoteName}"));
 
     private static void EnsureColumns(string sourceTableName, IReadOnlyList<Column> columns)
     {

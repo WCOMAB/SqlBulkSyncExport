@@ -24,6 +24,18 @@ public sealed class SqlStatementsTests
         => Verify(SqlStatements.GetSelectAllStatement("dbo.Customers", Columns, useSnapshotIsolation: false));
 
     [Fact]
+    public Task SelectAllCount_MatchesSnapshot()
+        => Verify(SqlStatements.GetSelectAllCountStatement("dbo.Customers", useSnapshotIsolation: false));
+
+    [Fact]
+    public Task NewOrUpdatedCount_MatchesSnapshot()
+        => Verify(SqlStatements.GetNewOrUpdatedCountStatement("dbo.Customers", Columns));
+
+    [Fact]
+    public Task DeletedCount_MatchesSnapshot()
+        => Verify(SqlStatements.GetDeletedPrimaryKeysCountStatement("dbo.Customers", Columns));
+
+    [Fact]
     public Task ChangeTrackingVersion_MatchesSnapshot()
         => Verify(SqlStatements.GetChangeTrackingVersionStatement("dbo.Customers"));
 }

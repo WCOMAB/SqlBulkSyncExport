@@ -8,7 +8,8 @@ includeHeader: true
 newLine: "\r\n"
 writeDeleted: false
 commandTimeoutSeconds: 180
-progressLogBatchSize: 10000
+# progressLogBatchSize: omit/null = auto (tiered % via COUNT + ETA); 0 = off; N = fixed interval
+# progressLogBatchSize: 10000
 
 # Uncomment to use interval full sync instead of change tracking:
 # fullSync:

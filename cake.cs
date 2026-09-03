@@ -187,5 +187,26 @@ Task("Clean")
                 Source = data.NuGetSource,
                 ApiKey = data.NuGetApiKey
             }))
+.Then("Create-GitHub-Release")
+    .WithCriteria<BuildData>((_, data) => data.ShouldPushNuGetPackages())
+    .Does<BuildData>(
+        static (context, data) => context.Command(
+            new CommandSettings
+            {
+                ToolName = "GitHub CLI",
+                ToolExecutableNames = ["gh.exe", "gh"],
+                EnvironmentVariables = { ["GH_TOKEN"] = data.GitHubNuGetApiKey }
+            },
+            new ProcessArgumentBuilder()
+                .Append("release")
+                .Append("create")
+                .Append(data.Version)
+                .AppendSwitchQuoted("--title", data.Version)
+                .Append("--generate-notes")
+                .Append(string.Join(
+                    ' ',
+                    context
+                        .GetFiles(data.NuGetOutputPath.FullPath + "/*.nupkg")
+                        .Select(path => path.FullPath.Quote())))))
 .Then("GitHub-Actions")
 .Run();

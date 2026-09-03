@@ -9,6 +9,7 @@ namespace SqlBulkSyncExport.Services.Csv;
 public sealed class SepCsvExportWriter(ILogger<SepCsvExportWriter> logger) : ICsvExportWriter
 {
     private const string DateTimeFormat = "yyyy-MM-dd'T'HH:mm:ss.fffK";
+    private const string DateTimeUnspecifiedFormat = "yyyy-MM-dd'T'HH:mm:ss.fff";
     private const string DateOnlyFormat = "yyyy-MM-dd";
     private const string TimeOnlyFormat = "HH:mm:ss.fffK";
     private const string TimeSpanFormat = @"hh\:mm\:ss\.fff";
@@ -226,17 +227,40 @@ public sealed class SepCsvExportWriter(ILogger<SepCsvExportWriter> logger) : ICs
     }
 
     private static string FormatDateTime(DateTime dt, TimeZoneInfo sourceTimeZone)
-        => dt.Kind == DateTimeKind.Utc
-            ? dt.ToString(DateTimeFormat, CultureInfo.InvariantCulture)
-            : ToSourceDateTimeOffset(dt, sourceTimeZone)
-                .ToString(DateTimeFormat, CultureInfo.InvariantCulture);
-
-    private static DateTimeOffset ToSourceDateTimeOffset(DateTime dt, TimeZoneInfo sourceTimeZone)
-        => dt.Kind switch
+    {
+        if (dt.Kind == DateTimeKind.Utc)
         {
-            DateTimeKind.Local => new DateTimeOffset(dt),
-            _ => new DateTimeOffset(
-                DateTime.SpecifyKind(dt, DateTimeKind.Unspecified),
-                sourceTimeZone.GetUtcOffset(dt)),
-        };
+            return dt.ToString(DateTimeFormat, CultureInfo.InvariantCulture);
+        }
+
+        if (TryToSourceDateTimeOffset(dt, sourceTimeZone, out var dto))
+        {
+            return dto.ToString(DateTimeFormat, CultureInfo.InvariantCulture);
+        }
+
+        // Offset would push outside DateTimeOffset range (e.g. 0001-01-01 with +02:00).
+        return DateTime.SpecifyKind(dt, DateTimeKind.Unspecified)
+            .ToString(DateTimeUnspecifiedFormat, CultureInfo.InvariantCulture);
+    }
+
+    private static bool TryToSourceDateTimeOffset(
+        DateTime dt,
+        TimeZoneInfo sourceTimeZone,
+        out DateTimeOffset dto)
+    {
+        try
+        {
+            dto = dt.Kind == DateTimeKind.Local
+                ? new DateTimeOffset(dt)
+                : new DateTimeOffset(
+                    DateTime.SpecifyKind(dt, DateTimeKind.Unspecified),
+                    sourceTimeZone.GetUtcOffset(dt));
+            return true;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            dto = default;
+            return false;
+        }
+    }
 }

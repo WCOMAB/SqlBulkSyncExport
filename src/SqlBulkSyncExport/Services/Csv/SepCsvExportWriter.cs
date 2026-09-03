@@ -2,6 +2,7 @@ using System.Data.Common;
 using System.Globalization;
 using System.Text;
 using nietras.SeparatedValues;
+using SqlBulkSyncExport.Helpers;
 
 namespace SqlBulkSyncExport.Services.Csv;
 
@@ -56,6 +57,8 @@ public sealed class SepCsvExportWriter(ILogger<SepCsvExportWriter> logger) : ICs
         }
 
         var batchSize = options.ProgressLogBatchSize;
+        var estimatedTotalRows = options.EstimatedTotalRows;
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         long rows = 0;
         while (await reader.ReadAsync(cancellationToken))
         {
@@ -111,14 +114,33 @@ public sealed class SepCsvExportWriter(ILogger<SepCsvExportWriter> logger) : ICs
 
             if (batchSize > 0 && rows % batchSize == 0)
             {
-                logger.LogInformation(
-                    "Wrote {Rows} rows to {Path}",
-                    rows,
-                    filePath);
+                LogProgress(rows, filePath, estimatedTotalRows, stopwatch.Elapsed);
             }
         }
 
         return rows;
+    }
+
+    private void LogProgress(long rows, string filePath, long? estimatedTotalRows, TimeSpan elapsed)
+    {
+        if (estimatedTotalRows is long estimated && estimated > 0)
+        {
+            var percent = ProgressLogFormatter.PercentComplete(rows, estimated);
+            var eta = ProgressLogFormatter.EstimateRemaining(elapsed, rows, estimated);
+            logger.LogInformation(
+                "Wrote {Rows}/{Estimated} rows ({Percent:0}%) to {Path}; ETA {Eta}",
+                rows,
+                estimated,
+                percent,
+                filePath,
+                ProgressLogFormatter.FormatEta(eta));
+            return;
+        }
+
+        logger.LogInformation(
+            "Wrote {Rows} rows to {Path}",
+            rows,
+            filePath);
     }
 
     private static string[] CacheFieldNames(DbDataReader reader, int fieldCount)

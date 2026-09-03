@@ -5,4 +5,5 @@ public sealed record CsvWriteOptions(
     bool IncludeHeader,
     string NewLine,
     TimeZoneInfo SourceTimeZone,
-    int ProgressLogBatchSize = 10_000);
+    int ProgressLogBatchSize = 0,
+    long? EstimatedTotalRows = null);

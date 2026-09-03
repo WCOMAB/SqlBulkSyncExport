@@ -15,8 +15,12 @@ public sealed class ExportConfig
 
     public int CommandTimeoutSeconds { get; init; } = 180;
 
-    /// <summary>Log progress every N written rows. Defaults to 10000 when omitted. Use 0 or less to disable.</summary>
-    public int ProgressLogBatchSize { get; init; } = 10_000;
+    /// <summary>
+    /// Log progress every N written rows.
+    /// Null/omitted = auto (~1% via COUNT, with percent and ETA).
+    /// Use 0 or less to disable. Positive = fixed interval without COUNT/%/ETA.
+    /// </summary>
+    public int? ProgressLogBatchSize { get; init; }
 
     public FullSyncConfig? FullSync { get; init; }
 

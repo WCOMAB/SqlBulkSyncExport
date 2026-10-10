@@ -6,6 +6,8 @@ public record BuildData(
     bool IsMainBranch,
     bool ShouldNotPublish,
     bool IsLocalBuild,
+    bool IsRunningOnGitHubActions,
+    string? WorkflowRef,
     DirectoryPath ProjectRoot,
     FilePath ProjectPath,
     DotNetMSBuildSettings MSBuildSettings,
@@ -27,7 +29,14 @@ public record BuildData(
         && !string.IsNullOrWhiteSpace(GitHubNuGetApiKey);
 
     public string? NuGetSource { get; } = Environment.GetEnvironmentVariable("NUGET_SOURCE");
-    public string? NuGetApiKey { get; } = Environment.GetEnvironmentVariable("NUGET_APIKEY");
+    public string? NuGetApiUser { get; } = Environment.GetEnvironmentVariable("NUGET_USER");
+    public string? NuGetApiKey { get; set; } = Environment.GetEnvironmentVariable("NUGET_APIKEY");
+
+    public bool ShouldLoginNuGet() =>
+        !ShouldNotPublish
+        && IsRunningOnGitHubActions
+        && (IsMainBranch
+            || (WorkflowRef?.StartsWith("refs/tags/v", StringComparison.Ordinal) ?? false));
 
     public bool ShouldPushNuGetPackages() =>
         IsMainBranch

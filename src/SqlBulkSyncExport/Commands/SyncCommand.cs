@@ -5,7 +5,7 @@ public sealed class SyncCommand(
     ISyncExportService syncExportService,
     ILogger<SyncCommand> logger) : AsyncCommand<SyncSettings>
 {
-    protected override async Task<int> ExecuteAsync(
+    public override async Task<int> ExecuteAsync(
         CommandContext context,
         SyncSettings settings,
         CancellationToken cancellationToken)

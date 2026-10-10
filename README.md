@@ -1,5 +1,7 @@
 # SqlBulkSyncExport
 
+[![NuGet](https://img.shields.io/nuget/v/SqlBulkSyncExport.svg)](https://www.nuget.org/packages/SqlBulkSyncExport)
+
 .NET global tool that exports SQL Server **change tracking** deltas (and optional interval **full sync**) to CSV files in a target folder.
 
 Inspired by [SqlBulkSyncFunction](https://github.com/WCOMAB/SqlBulkSyncFunction), without a target database: source schema drives CSV columns, and sync watermarks live in a YAML state file.

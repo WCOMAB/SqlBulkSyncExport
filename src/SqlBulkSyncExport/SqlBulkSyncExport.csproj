@@ -24,6 +24,7 @@
     <PackageReference Include="Devlead.Console" />
     <PackageReference Include="Microsoft.Data.SqlClient" />
     <PackageReference Include="Sep" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
     <PackageReference Include="YamlDotNet" />
   </ItemGroup>
 
